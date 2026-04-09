@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Salary Manager</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ── Setup Modal ─────────────────────────────────────────────────────────── -->
+<div id="setup-overlay" class="overlay hidden">
+  <div class="modal">
+    <h2 data-i18n="setup_title"></h2>
+    <p class="subtitle" data-i18n="setup_subtitle"></p>
+    <div class="form-group">
+      <label data-i18n="label_name"></label>
+      <input id="setup-name" type="text" data-i18n-ph="ph_name" />
+    </div>
+    <div class="form-group">
+      <label data-i18n="label_title"></label>
+      <input id="setup-title" type="text" data-i18n-ph="ph_title" />
+    </div>
+    <div class="form-group">
+      <label data-i18n="label_base_salary"></label>
+      <input id="setup-salary" type="number" min="0" step="0.01" placeholder="e.g. 5000" />
+    </div>
+    <button class="btn-primary" onclick="submitSetup()" data-i18n="btn_save_profile"></button>
+    <p id="setup-error" class="error hidden"></p>
+  </div>
+</div>
+
+<!-- ── Main App ────────────────────────────────────────────────────────────── -->
+<div id="app" class="hidden">
+
+  <!-- Header -->
+  <header>
+    <div class="header-left">
+      <h1 data-i18n="app_title"></h1>
+      <span id="header-user" class="user-badge"></span>
+    </div>
+    <div class="header-right">
+      <button class="btn-theme" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+      <button class="btn-lang btn-secondary btn-sm" id="lang-toggle" onclick="toggleLang()">VI</button>
+      <button class="btn-secondary btn-sm" onclick="openEditProfile()" data-i18n="btn_edit_profile"></button>
+    </div>
+  </header>
+
+  <!-- Edit Profile Modal -->
+  <div id="edit-overlay" class="overlay hidden">
+    <div class="modal">
+      <h2 data-i18n="edit_profile_title"></h2>
+      <div class="form-group">
+        <label data-i18n="label_name"></label>
+        <input id="edit-name" type="text" />
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_title"></label>
+        <input id="edit-title" type="text" />
+      </div>
+      <div class="form-group">
+        <label data-i18n="label_base_salary"></label>
+        <input id="edit-salary" type="number" min="0" step="0.01" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeEditProfile()" data-i18n="btn_cancel"></button>
+        <button class="btn-primary" onclick="saveEditProfile()" data-i18n="btn_save"></button>
+      </div>
+      <p id="edit-error" class="error hidden"></p>
+    </div>
+  </div>
+
+  <!-- ── 2-Column Layout ──────────────────────────────────────────────────── -->
+  <div class="two-col">
+
+    <!-- LEFT: Input only -->
+    <div class="col-left">
+
+      <!-- Income Input Card -->
+      <section class="card income-input-card">
+        <h3 data-i18n="record_income_title"></h3>
+        <div class="income-form">
+          <div class="form-group">
+            <label data-i18n="label_year"></label>
+            <input id="income-year" type="number" min="2000" max="2099" />
+          </div>
+          <div class="form-group">
+            <label data-i18n="label_month"></label>
+            <select id="income-month"></select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="label_income"></label>
+            <input id="income-amount" type="number" min="0" step="0.01" placeholder="0.00" />
+          </div>
+          <div class="form-group">
+            <label data-i18n="label_note"></label>
+            <input id="income-note" type="text" data-i18n-ph="ph_note" />
+          </div>
+          <button class="btn-primary" onclick="submitIncome()" data-i18n="btn_add_update"></button>
+        </div>
+        <p id="income-msg" class="msg hidden"></p>
+      </section>
+
+    </div><!-- /col-left -->
+
+    <!-- RIGHT: History + Analytics -->
+    <div class="col-right">
+      <section class="card analytics-card">
+
+        <!-- History -->
+        <h3 data-i18n="history_title"></h3>
+        <div class="table-wrap" id="history-table-wrap">
+          <table id="history-table">
+            <thead>
+              <tr>
+                <th data-i18n="col_year"></th>
+                <th data-i18n="col_month"></th>
+                <th data-i18n="col_income"></th>
+                <th data-i18n="col_note"></th>
+                <th data-i18n="col_recorded_at"></th>
+              </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+          <p id="history-empty" class="empty-state hidden" data-i18n="history_empty"></p>
+        </div>
+
+        <h3 data-i18n="tab_analytics"></h3>
+
+        <h4 data-i18n="section_monthly"></h4>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="col_year"></th>
+                <th data-i18n="col_month"></th>
+                <th data-i18n="col_income"></th>
+                <th data-i18n="col_base_salary"></th>
+                <th data-i18n="col_vs_base"></th>
+              </tr>
+            </thead>
+            <tbody id="monthly-body"></tbody>
+            <tfoot id="monthly-foot"></tfoot>
+          </table>
+          <p id="monthly-empty" class="empty-state hidden" data-i18n="monthly_empty"></p>
+        </div>
+
+        <h4 data-i18n="section_rolling"></h4>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="col_period"></th>
+                <th data-i18n="col_base_3m"></th>
+                <th data-i18n="col_income_sum"></th>
+                <th data-i18n="col_vs_base"></th>
+                <th data-i18n="col_actual_diff"></th>
+              </tr>
+            </thead>
+            <tbody id="rolling-body"></tbody>
+            <tfoot id="rolling-foot"></tfoot>
+          </table>
+          <p id="rolling-empty" class="empty-state hidden" data-i18n="rolling_empty"></p>
+        </div>
+
+        <h4 data-i18n="section_annual"></h4>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="col_year"></th>
+                <th data-i18n="col_base_x12"></th>
+                <th data-i18n="col_total_income"></th>
+                <th data-i18n="col_vs_base"></th>
+                <th data-i18n="col_actual_diff"></th>
+              </tr>
+            </thead>
+            <tbody id="annual-body"></tbody>
+          </table>
+          <p id="annual-empty" class="empty-state hidden" data-i18n="annual_empty"></p>
+        </div>
+
+      </section>
+    </div><!-- /col-right -->
+
+  </div><!-- /two-col -->
+
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
