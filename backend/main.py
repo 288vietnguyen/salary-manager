@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -8,16 +9,17 @@ import os
 from database import init_db, get_users, create_user, update_user, upsert_income, get_income_history, get_income_for_stats, delete_income
 from gmail_integration import is_connected, load_config, save_config, scan_emails
 
-app = FastAPI(title="Salary Manager")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+app = FastAPI(title="Salary Manager", lifespan=lifespan)
 
 # Serve frontend static files
 _BUNDLE_DIR  = os.environ.get("SM_BUNDLE_DIR", os.path.join(os.path.dirname(__file__), ".."))
 FRONTEND_DIR = os.path.join(_BUNDLE_DIR, "frontend")
-
-
-@app.on_event("startup")
-def startup():
-    init_db()
 
 
 # ── Static files & root ───────────────────────────────────────────────────────
@@ -105,12 +107,14 @@ def api_get_stats(user_id: int):
     for row in rows:
         curr = row["income"]
         diff_pct = round((curr - base_salary) / base_salary * 100, 2) if base_salary != 0 else None
+        actual_diff = round(curr - base_salary, 2)
         monthly.append({
             "year": row["year"],
             "month": row["month"],
             "income": curr,
             "base_salary": base_salary,
             "diff_pct": diff_pct,
+            "actual_diff": actual_diff,
         })
 
     # ── Fixed quarterly (Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec) ──────

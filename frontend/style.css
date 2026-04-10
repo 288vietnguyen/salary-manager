@@ -304,7 +304,7 @@ tfoot { position: sticky; bottom: 0; z-index: 1; }
 
 /* Wider scan preview modal */
 .gmail-scan-modal {
-  width: min(760px, 95vw);
+  width: min(960px, 95vw);
   max-height: 85vh;
   display: flex;
   flex-direction: column;

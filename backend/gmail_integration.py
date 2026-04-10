@@ -94,6 +94,43 @@ def _html_to_text(html: str) -> str:
     return p.get_text()
 
 
+_KPI_BONUS_KEYWORDS      = ["thưởng đánh giá kpi", "thưởng kpi", "kpi bonus", "kpis bonus"]
+_KPI_DEDUCTION_KEYWORDS  = ["trừ đánh giá kpi", "trừ kpi", "kpi deduction", "kpi penalty"]
+
+
+def _number_from_line(line: str) -> Optional[float]:
+    """Return the rightmost valid number (≥5 digits) from a single line."""
+    nums = re.findall(r"-?\d[\d.,]*\d", line)
+    for n in reversed(nums):
+        cleaned = re.sub(r"[.,]", "", n.lstrip("-"))
+        if cleaned.isdigit() and len(cleaned) >= 5:
+            return float(cleaned)
+    return None
+
+
+def _extract_kpi(text: str) -> dict:
+    """Return {'kpi_bonus': float|None, 'kpi_deduction': float|None}."""
+    bonus      = None
+    deduction  = None
+    lines      = text.splitlines()
+    for i, line in enumerate(lines):
+        ll = line.lower()
+        if bonus is None and any(kw in ll for kw in _KPI_BONUS_KEYWORDS):
+            # Try same line first, then next line
+            for sl in lines[i:i + 2]:
+                v = _number_from_line(sl)
+                if v is not None:
+                    bonus = v
+                    break
+        if deduction is None and any(kw in ll for kw in _KPI_DEDUCTION_KEYWORDS):
+            for sl in lines[i:i + 2]:
+                v = _number_from_line(sl)
+                if v is not None:
+                    deduction = v
+                    break
+    return {"kpi_bonus": bonus, "kpi_deduction": deduction}
+
+
 def _amount_from_text(text: str, compiled_re) -> Optional[float]:
     """Try regex first, then keyword proximity search on multiline text."""
     # 1. Regex match
@@ -136,7 +173,21 @@ def _extract_images(msg) -> list:
 _ocr_reader = None
 MODELS_DIR  = os.path.join(_BUNDLE_DIR, "models")
 
-_NET_KEYWORDS = ["lương net", "thực nhận", "net salary", "take home", "lươngnet"]
+_NET_KEYWORDS = [
+    # New format (row VI)
+    "số tiền thực lĩnh",
+    "thực lĩnh",
+    # Common Vietnamese payslip terms
+    "lương net",
+    "thực nhận",
+    "lươngnet",
+    "thực tế nhận",
+    # English equivalents
+    "net salary",
+    "take home",
+    "net pay",
+    "amount payable",
+]
 
 def _get_ocr_reader():
     global _ocr_reader
@@ -256,18 +307,22 @@ def scan_emails(year: Optional[int] = None, month: Optional[int] = None) -> list
 
         amount     = None
         unresolved = True
+        kpi        = {"kpi_bonus": None, "kpi_deduction": None}
 
         # 1. Try plain text
         if plain_text:
             result = _amount_from_text(plain_text, compiled_re)
             if result is not None:
                 amount, unresolved = result, False
+            kpi = _extract_kpi(plain_text)
 
         # 2. Try HTML table text
         if unresolved and html_text:
             result = _amount_from_text(html_text, compiled_re)
             if result is not None:
                 amount, unresolved = result, False
+        if html_text and kpi["kpi_bonus"] is None and kpi["kpi_deduction"] is None:
+            kpi = _extract_kpi(html_text)
 
         # 3. Fall back to OCR on image attachments
         if unresolved:
@@ -278,13 +333,15 @@ def scan_emails(year: Optional[int] = None, month: Optional[int] = None) -> list
                     break
 
         results.append({
-            "year":       msg_year,
-            "month":      msg_month,
-            "amount":     amount,
-            "subject":    subject,
-            "from":       from_addr,
-            "date":       date_str,
-            "unresolved": unresolved,
+            "year":          msg_year,
+            "month":         msg_month,
+            "amount":        amount,
+            "subject":       subject,
+            "from":          from_addr,
+            "date":          date_str,
+            "unresolved":    unresolved,
+            "kpi_bonus":     kpi["kpi_bonus"],
+            "kpi_deduction": kpi["kpi_deduction"],
         })
 
     mail.logout()

@@ -74,6 +74,8 @@ const TRANSLATIONS = {
     gmail_col_date:           'Email Date',
     gmail_col_subject:        'Subject',
     gmail_col_amount:         'Amount',
+    gmail_col_kpi_bonus:      'KPI Bonus',
+    gmail_col_kpi_deduct:     'KPI Deduction',
     gmail_btn_import_selected:'Import Selected',
     gmail_scanning:           'Scanning your emails…',
     gmail_scan_empty:         'No matching emails found.',
@@ -151,6 +153,8 @@ const TRANSLATIONS = {
     gmail_col_date:           'Ngày Email',
     gmail_col_subject:        'Tiêu Đề',
     gmail_col_amount:         'Số Tiền',
+    gmail_col_kpi_bonus:      'Thưởng KPI',
+    gmail_col_kpi_deduct:     'Trừ KPI',
     gmail_btn_import_selected:'Nhập Đã Chọn',
     gmail_scanning:           'Đang quét email của bạn…',
     gmail_scan_empty:         'Không tìm thấy email phù hợp.',
@@ -371,6 +375,7 @@ async function loadAnalytics() {
         <td>${fmt(r.income)}</td>
         <td>${fmt(r.base_salary)}</td>
         <td>${pctBadge(r.diff_pct)}</td>
+        <td>${diffBadge(r.actual_diff)}</td>
       `;
       mBody.appendChild(tr);
     });
@@ -378,6 +383,7 @@ async function loadAnalytics() {
     // Total row
     const totalIncome = stats.monthly.reduce((s, r) => s + r.income, 0);
     const totalBase   = stats.monthly.reduce((s, r) => s + r.base_salary, 0);
+    const totalActual = Math.round((totalIncome - totalBase) * 100) / 100;
     const validPcts   = stats.monthly.filter(r => r.diff_pct !== null).map(r => r.diff_pct);
     const avgPct      = validPcts.length ? Math.round(validPcts.reduce((a, b) => a + b, 0) / validPcts.length * 100) / 100 : null;
     const mFoot = document.getElementById('monthly-foot');
@@ -386,6 +392,7 @@ async function loadAnalytics() {
       <td><strong>${fmt(totalIncome)}</strong></td>
       <td><strong>${fmt(totalBase)}</strong></td>
       <td>${pctBadge(avgPct)}</td>
+      <td>${diffBadge(totalActual)}</td>
     </tr>`;
   }
 
@@ -602,7 +609,7 @@ function renderGmailPreview(entries) {
       <td>${e.year}</td>
       <td>${TRANSLATIONS[currentLang].months[e.month]}</td>
       <td>${amountDisplay}</td>
-      <td class="dim" title="${e.subject}">${e.subject.slice(0, 40)}${e.subject.length > 40 ? '…' : ''}</td>
+      <td class="dim" title="${e.subject}">${e.subject.slice(0, 60)}${e.subject.length > 60 ? '…' : ''}</td>
       <td class="dim">${e.date}</td>
     `;
     tbody.appendChild(tr);
@@ -628,12 +635,18 @@ async function gmailImportSelected() {
   let imported = 0;
 
   for (const entry of toImport) {
+    const kpiParts = [];
+    if (entry.kpi_bonus     !== null && entry.kpi_bonus     !== undefined) kpiParts.push(`KPI+${fmt(entry.kpi_bonus)}`);
+    if (entry.kpi_deduction !== null && entry.kpi_deduction !== undefined) kpiParts.push(`KPI-${fmt(entry.kpi_deduction)}`);
+    const note = kpiParts.length
+      ? `${kpiParts.join(' | ')} | Gmail: ${entry.subject.slice(0, 60)}`
+      : `Gmail: ${entry.subject.slice(0, 80)}`;
     await api('/api/income', 'POST', {
       user_id: currentUser.id,
       year:    entry.year,
       month:   entry.month,
       income:  entry.amount,
-      note:    `Gmail: ${entry.subject.slice(0, 80)}`,
+      note,
     });
     imported++;
   }

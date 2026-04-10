@@ -26,6 +26,17 @@ os.environ["SM_DATA_DIR"]   = _DATA_DIR
 # Add bundled backend to import path
 sys.path.insert(0, os.path.join(_BUNDLE_DIR, "backend"))
 
+# ── Fix stdout/stderr for windowed (console=False) PyInstaller builds ─────────
+# When built with console=False, sys.stdout and sys.stderr are None.
+# Uvicorn's DefaultFormatter calls stream.isatty() during logging config,
+# which raises AttributeError on None. Redirect to a log file to fix this.
+
+if getattr(sys, "frozen", False) and sys.stdout is None:
+    _log_path = os.path.join(_DATA_DIR, "salary-manager.log")
+    _log_file = open(_log_path, "a", encoding="utf-8", buffering=1)
+    sys.stdout = _log_file
+    sys.stderr = _log_file
+
 # ── Launch ────────────────────────────────────────────────────────────────────
 
 import uvicorn  # noqa: E402  (must come after sys.path update)
@@ -40,4 +51,6 @@ def _open_browser():
 
 if __name__ == "__main__":
     threading.Thread(target=_open_browser, daemon=True).start()
-    uvicorn.run("main:app", host="127.0.0.1", port=PORT, log_level="error")
+    # log_config=None disables uvicorn's logging setup entirely,
+    # avoiding any further formatter/stream issues in the frozen exe.
+    uvicorn.run("main:app", host="127.0.0.1", port=PORT, log_config=None)
