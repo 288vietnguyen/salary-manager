@@ -5,6 +5,14 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== Salary Manager ==="
 
+# Kill any process still holding port 8080
+echo "[0/3] Clearing port 8080..."
+PID=$(lsof -ti :8080 2>/dev/null || true)
+if [ -n "$PID" ]; then
+    echo "  Killing PID $PID"
+    kill -9 $PID 2>/dev/null || true
+fi
+
 # Create virtual environment if it doesn't exist
 if [ ! -d "$ROOT/venv" ]; then
   echo "[1/3] Creating virtual environment..."
