@@ -101,6 +101,20 @@
         <p id="income-msg" class="msg hidden"></p>
       </section>
 
+      <!-- Gmail Import Card -->
+      <section class="card gmail-card" id="gmail-card">
+        <div class="gmail-header">
+          <h3 data-i18n="gmail_section_title"></h3>
+          <span id="gmail-status-badge" class="badge flat"></span>
+        </div>
+        <div id="gmail-connect-area">
+          <button class="btn-secondary btn-sm" onclick="openGmailSettings()"
+                  data-i18n="gmail_btn_settings"></button>
+          <button class="btn-primary btn-sm" onclick="gmailScan()" data-i18n="gmail_btn_scan"></button>
+        </div>
+        <p id="gmail-msg" class="msg hidden"></p>
+      </section>
+
     </div><!-- /col-left -->
 
     <!-- RIGHT: History + Analytics -->
@@ -118,6 +132,7 @@
                 <th data-i18n="col_income"></th>
                 <th data-i18n="col_note"></th>
                 <th data-i18n="col_recorded_at"></th>
+                <th data-i18n=""></th>
               </tr>
             </thead>
             <tbody id="history-body"></tbody>
@@ -187,6 +202,72 @@
 
 </div>
 
-<script src="/static/app.js"></script>
+<!-- Scanning Loader -->
+<div id="scan-loader" class="overlay hidden">
+  <div class="loader-box">
+    <div class="spinner"></div>
+    <p data-i18n="gmail_scanning"></p>
+  </div>
+</div>
+
+<!-- Gmail Settings Modal -->
+<div id="gmail-settings-overlay" class="overlay hidden">
+  <div class="modal">
+    <h2 data-i18n="gmail_btn_settings"></h2>
+    <div class="form-group">
+      <label data-i18n="gmail_label_email"></label>
+      <input id="gmail-email" type="email" placeholder="you@gmail.com" />
+    </div>
+    <div class="form-group">
+      <label data-i18n="gmail_label_password"></label>
+      <input id="gmail-password" type="password" placeholder="xxxx xxxx xxxx xxxx" />
+      <small id="gmail-password-hint" class="dim" data-i18n="gmail_password_hint"></small>
+    </div>
+    <div class="form-group">
+      <label data-i18n="gmail_label_sender"></label>
+      <input id="gmail-sender" type="text" placeholder="payroll@company.com" />
+    </div>
+    <div class="form-group">
+      <label data-i18n="gmail_label_regex"></label>
+      <input id="gmail-regex" type="text" placeholder="(?P&lt;amount&gt;[\d,]+\.?\d*)" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary btn-sm" onclick="closeGmailSettings()" data-i18n="btn_cancel"></button>
+      <button class="btn-primary btn-sm" onclick="saveGmailConfig()" data-i18n="gmail_btn_save_config"></button>
+    </div>
+    <p id="gmail-config-msg" class="msg hidden"></p>
+  </div>
+</div>
+
+<!-- Gmail Scan Preview Modal -->
+<div id="gmail-scan-overlay" class="overlay hidden">
+  <div class="modal gmail-scan-modal">
+    <h2 data-i18n="gmail_scan_title"></h2>
+    <div class="table-wrap gmail-preview-wrap" id="gmail-preview-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="gmail-select-all" onchange="gmailToggleAll(this)" /></th>
+            <th data-i18n="col_year"></th>
+            <th data-i18n="col_month"></th>
+            <th data-i18n="gmail_col_amount"></th>
+            <th data-i18n="gmail_col_subject"></th>
+            <th data-i18n="gmail_col_date"></th>
+            <th>YUhCaWJ5QjVjbVozSUdsc2JHWWdaV1poYmc9PQ==</th>
+          </tr>
+        </thead>
+        <tbody id="gmail-preview-body"></tbody>
+      </table>
+      <p id="gmail-scan-empty" class="empty-state hidden" data-i18n="gmail_scan_empty"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary btn-sm" onclick="closeGmailScan()" data-i18n="btn_cancel"></button>
+      <button class="btn-primary btn-sm" onclick="gmailImportSelected()" data-i18n="gmail_btn_import_selected"></button>
+    </div>
+    <p id="gmail-import-msg" class="msg hidden"></p>
+  </div>
+</div>
+
+<script src="/static/app.js?v=8"></script>
 </body>
 </html>

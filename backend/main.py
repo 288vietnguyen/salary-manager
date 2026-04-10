@@ -4,14 +4,15 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
 import os
-import math
 
-from database import init_db, get_users, create_user, update_user, upsert_income, get_income_history, get_income_for_stats
+from database import init_db, get_users, create_user, update_user, upsert_income, get_income_history, get_income_for_stats, delete_income
+from gmail_integration import is_connected, load_config, save_config, scan_emails
 
 app = FastAPI(title="Salary Manager")
 
 # Serve frontend static files
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
+_BUNDLE_DIR  = os.environ.get("SM_BUNDLE_DIR", os.path.join(os.path.dirname(__file__), ".."))
+FRONTEND_DIR = os.path.join(_BUNDLE_DIR, "frontend")
 
 
 @app.on_event("startup")
@@ -78,6 +79,12 @@ def api_get_income(user_id: int):
 @app.post("/api/income")
 def api_add_income(body: IncomeInput):
     upsert_income(body.user_id, body.year, body.month, body.income, body.note or "")
+    return {"ok": True}
+
+
+@app.delete("/api/income/{income_id}")
+def api_delete_income(income_id: int):
+    delete_income(income_id)
     return {"ok": True}
 
 
@@ -161,3 +168,49 @@ def api_get_stats(user_id: int):
         })
 
     return {"monthly": monthly, "rolling3": rolling3, "annual": annual, "base_salary": base_salary}
+
+
+# ── Gmail ─────────────────────────────────────────────────────────────────────
+
+class GmailConfig(BaseModel):
+    email: str
+    app_password: str
+    sender_filter: str
+    amount_regex: str
+
+
+class GmailScanRequest(BaseModel):
+    user_id: int
+    year: Optional[int] = None
+    month: Optional[int] = None
+
+
+@app.get("/api/gmail/status")
+def api_gmail_status():
+    return {"connected": is_connected()}
+
+
+@app.get("/api/gmail/config")
+def api_gmail_get_config():
+    cfg = load_config()
+    # Never return the app_password to the frontend
+    return {
+        "email": cfg.get("email", ""),
+        "sender_filter": cfg.get("sender_filter", ""),
+        "amount_regex": cfg.get("amount_regex", ""),
+        "has_password": bool(cfg.get("app_password")),
+    }
+
+
+@app.post("/api/gmail/config")
+def api_gmail_save_config(body: GmailConfig):
+    # If app_password is blank, keep the existing one
+    existing = load_config()
+    password = body.app_password or existing.get("app_password", "")
+    save_config(body.email, password, body.sender_filter, body.amount_regex)
+    return {"ok": True}
+
+
+@app.post("/api/gmail/scan")
+def api_gmail_scan(body: GmailScanRequest):
+    return scan_emails(year=body.year, month=body.month)

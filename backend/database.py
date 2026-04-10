@@ -2,7 +2,8 @@ import sqlite3
 import os
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "salary_manager.db")
+_DATA_DIR = os.environ.get("SM_DATA_DIR", os.path.dirname(__file__))
+DB_PATH = os.path.join(_DATA_DIR, "salary_manager.db")
 
 
 def get_conn():
@@ -92,6 +93,13 @@ def get_income_history(user_id: int):
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def delete_income(income_id: int):
+    conn = get_conn()
+    conn.execute("DELETE FROM monthly_income WHERE id=?", (income_id,))
+    conn.commit()
+    conn.close()
 
 
 def get_income_for_stats(user_id: int):

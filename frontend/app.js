@@ -1,5 +1,7 @@
 /* ── State ────────────────────────────────────────────────────────────────── */
-let currentUser = null;
+let currentUser      = null;
+let gmailConnected   = false;
+let gmailScanResults = [];
 
 /* ── i18n ─────────────────────────────────────────────────────────────────── */
 const TRANSLATIONS = {
@@ -54,6 +56,31 @@ const TRANSLATIONS = {
     saved_income:      (month, year) => `Saved income for ${month} ${year}.`,
     months: ['', 'January','February','March','April','May','June',
              'July','August','September','October','November','December'],
+    col_actions:              'Actions',
+    btn_delete:               'Delete',
+    confirm_delete:           'Delete this income record?',
+    gmail_section_title:      'Gmail Import',
+    gmail_status_connected:   'Connected',
+    gmail_status_disconnected:'Not connected',
+    gmail_btn_settings:       'Settings',
+    gmail_label_email:        'Your Gmail Address',
+    gmail_label_password:     'App Password',
+    gmail_password_hint:      'Generate at: https://myaccount.google.com/apppasswords',
+    gmail_label_sender:       'Sender Email / Domain',
+    gmail_label_regex:        'Amount Regex (named group: amount)',
+    gmail_btn_save_config:    'Save',
+    gmail_btn_scan:           'Scan Emails',
+    gmail_scan_title:         'Email Scan Results',
+    gmail_col_date:           'Email Date',
+    gmail_col_subject:        'Subject',
+    gmail_col_amount:         'Amount',
+    gmail_btn_import_selected:'Import Selected',
+    gmail_scanning:           'Scanning your emails…',
+    gmail_scan_empty:         'No matching emails found.',
+    gmail_scan_no_amount:     'No amount found',
+    gmail_import_success:     (n) => `Imported ${n} entr${n === 1 ? 'y' : 'ies'}.`,
+    gmail_config_saved:       'Settings saved.',
+    gmail_connecting:         'Opening Google login…',
   },
   vi: {
     app_title:         'Quản Lý Lương',
@@ -106,6 +133,31 @@ const TRANSLATIONS = {
     saved_income:      (month, year) => `Đã lưu thu nhập tháng ${month} năm ${year}.`,
     months: ['', 'Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6',
              'Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'],
+    col_actions:              'Thao Tác',
+    btn_delete:               'Xóa',
+    confirm_delete:           'Xóa bản ghi thu nhập này?',
+    gmail_section_title:      'Nhập Từ Gmail',
+    gmail_status_connected:   'Đã kết nối',
+    gmail_status_disconnected:'Chưa kết nối',
+    gmail_btn_settings:       'Cài Đặt',
+    gmail_label_email:        'Địa Chỉ Gmail Của Bạn',
+    gmail_label_password:     'Mật Khẩu Ứng Dụng',
+    gmail_password_hint:      'Tạo tại: https://myaccount.google.com/apppasswords',
+    gmail_label_sender:       'Email / Tên miền người gửi',
+    gmail_label_regex:        'Regex Số Tiền (nhóm tên: amount)',
+    gmail_btn_save_config:    'Lưu',
+    gmail_btn_scan:           'Quét Email',
+    gmail_scan_title:         'Kết Quả Quét Email',
+    gmail_col_date:           'Ngày Email',
+    gmail_col_subject:        'Tiêu Đề',
+    gmail_col_amount:         'Số Tiền',
+    gmail_btn_import_selected:'Nhập Đã Chọn',
+    gmail_scanning:           'Đang quét email của bạn…',
+    gmail_scan_empty:         'Không tìm thấy email phù hợp.',
+    gmail_scan_no_amount:     'Không tìm thấy số tiền',
+    gmail_import_success:     (n) => `Đã nhập ${n} mục.`,
+    gmail_config_saved:       'Đã lưu cài đặt.',
+    gmail_connecting:         'Đang mở đăng nhập Google…',
   },
 };
 
@@ -145,6 +197,7 @@ function applyLang() {
   if (btn) btn.textContent = currentLang === 'en' ? 'VI' : 'EN';
   document.documentElement.lang = currentLang;
   localStorage.setItem('lang', currentLang);
+  renderGmailStatus();
 }
 
 function toggleLang() {
@@ -188,6 +241,8 @@ async function boot() {
     currentUser = users[0];
     showApp();
   }
+  checkGmailCallbackParams();
+  await checkGmailStatus();
 }
 
 function showApp() {
@@ -284,12 +339,14 @@ async function loadHistory() {
 
   rows.forEach(r => {
     const tr = document.createElement('tr');
+    tr.id = `income-row-${r.id}`;
     tr.innerHTML = `
       <td>${r.year}</td>
       <td>${TRANSLATIONS[currentLang].months[r.month]}</td>
       <td>${fmt(r.income)}</td>
       <td>${r.note || '—'}</td>
       <td class="dim">${fmtDate(r.created_at)}</td>
+      <td><button class="btn-delete" onclick="deleteIncome(${r.id})" title="${t('btn_delete')}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button></td>
     `;
     tbody.appendChild(tr);
   });
@@ -395,7 +452,11 @@ async function api(path, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
-  if (!res.ok) throw new Error(`API error ${res.status}`);
+  if (!res.ok) {
+    let msg = `API error ${res.status}`;
+    try { const j = await res.json(); if (j.detail) msg = j.detail; } catch {}
+    throw new Error(msg);
+  }
   return res.json();
 }
 
@@ -441,6 +502,149 @@ function diffBadge(v) {
   const cls  = v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
   const sign = v > 0 ? '+' : '';
   return `<span class="badge ${cls}">${sign}${fmt(v)}</span>`;
+}
+
+/* ── Delete Income ────────────────────────────────────────────────────────── */
+async function deleteIncome(id) {
+  if (!confirm(t('confirm_delete'))) return;
+  await api(`/api/income/${id}`, 'DELETE');
+  const row = document.getElementById(`income-row-${id}`);
+  if (row) row.remove();
+  loadAnalytics();
+}
+
+/* ── Gmail ────────────────────────────────────────────────────────────────── */
+async function checkGmailStatus() {
+  try {
+    const data = await api('/api/gmail/status');
+    gmailConnected = data.connected;
+    renderGmailStatus();
+  } catch (e) { /* non-fatal */ }
+}
+
+function renderGmailStatus() {
+  const badge = document.getElementById('gmail-status-badge');
+  if (!badge) return;
+  if (gmailConnected) {
+    badge.textContent = t('gmail_status_connected');
+    badge.className   = 'badge up';
+  } else {
+    badge.textContent = t('gmail_status_disconnected');
+    badge.className   = 'badge flat';
+  }
+}
+
+function checkGmailCallbackParams() { /* no-op */ }
+
+async function openGmailSettings() {
+  const config = await api('/api/gmail/config');
+  document.getElementById('gmail-email').value    = config.email         || '';
+  document.getElementById('gmail-password').value = '';  // never pre-fill password
+  document.getElementById('gmail-sender').value   = config.sender_filter || '';
+  document.getElementById('gmail-regex').value    = config.amount_regex  || '';
+  const hint = document.getElementById('gmail-password');
+  if (config.has_password) hint.placeholder = '••••••••••••••••';
+  show('gmail-settings-overlay');
+}
+
+function closeGmailSettings() { hide('gmail-settings-overlay'); }
+
+async function saveGmailConfig() {
+  const gmail_email  = document.getElementById('gmail-email').value.trim();
+  const app_password = document.getElementById('gmail-password').value.trim();
+  const sender       = document.getElementById('gmail-sender').value.trim();
+  const regex        = document.getElementById('gmail-regex').value.trim();
+  await api('/api/gmail/config', 'POST', {
+    email: gmail_email, app_password, sender_filter: sender, amount_regex: regex,
+  });
+  const msg = document.getElementById('gmail-config-msg');
+  showMsg(msg, t('gmail_config_saved'), true);
+  await checkGmailStatus();
+  setTimeout(() => closeGmailSettings(), 1200);
+}
+
+async function gmailScan() {
+  const msg = document.getElementById('gmail-msg');
+  show('scan-loader');
+  try {
+    const results = await api('/api/gmail/scan', 'POST', {
+      user_id: currentUser.id, year: null, month: null,
+    });
+    gmailScanResults = results;
+    renderGmailPreview(results);
+    show('gmail-scan-overlay');
+  } catch (e) {
+    showMsg(msg, e.message, false);
+  } finally {
+    hide('scan-loader');
+  }
+}
+
+function renderGmailPreview(entries) {
+  const tbody = document.getElementById('gmail-preview-body');
+  tbody.innerHTML = '';
+
+  if (!entries.length) {
+    show('gmail-scan-empty');
+    return;
+  }
+  hide('gmail-scan-empty');
+
+  entries.forEach((e, i) => {
+    const amountDisplay = e.amount !== null
+      ? fmt(e.amount)
+      : `<span class="badge flat">${t('gmail_scan_no_amount')}</span>`;
+    const tr = document.createElement('tr');
+    if (e.unresolved) tr.className = 'gmail-unresolved';
+    tr.innerHTML = `
+      <td><input type="checkbox" class="gmail-entry-check" data-idx="${i}"
+                 ${e.amount !== null ? '' : 'disabled'} /></td>
+      <td>${e.year}</td>
+      <td>${TRANSLATIONS[currentLang].months[e.month]}</td>
+      <td>${amountDisplay}</td>
+      <td class="dim" title="${e.subject}">${e.subject.slice(0, 40)}${e.subject.length > 40 ? '…' : ''}</td>
+      <td class="dim">${e.date}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function gmailToggleAll(masterCb) {
+  document.querySelectorAll('.gmail-entry-check:not([disabled])')
+    .forEach(cb => { cb.checked = masterCb.checked; });
+}
+
+function closeGmailScan() {
+  hide('gmail-scan-overlay');
+  const selectAll = document.getElementById('gmail-select-all');
+  if (selectAll) selectAll.checked = false;
+}
+
+async function gmailImportSelected() {
+  const checked = [...document.querySelectorAll('.gmail-entry-check:checked')];
+  if (!checked.length) return;
+
+  const toImport = checked.map(cb => gmailScanResults[parseInt(cb.dataset.idx)]);
+  let imported = 0;
+
+  for (const entry of toImport) {
+    await api('/api/income', 'POST', {
+      user_id: currentUser.id,
+      year:    entry.year,
+      month:   entry.month,
+      income:  entry.amount,
+      note:    `Gmail: ${entry.subject.slice(0, 80)}`,
+    });
+    imported++;
+  }
+
+  const msg = document.getElementById('gmail-import-msg');
+  showMsg(msg, t('gmail_import_success', imported), true);
+  setTimeout(() => {
+    closeGmailScan();
+    loadHistory();
+    loadAnalytics();
+  }, 1500);
 }
 
 /* ── Start ────────────────────────────────────────────────────────────────── */

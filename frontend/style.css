@@ -137,7 +137,7 @@ input:focus, select:focus { border-color: var(--accent); }
 .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
 .btn-secondary:hover { background: var(--border); }
 
-.btn-sm { padding: .35rem .8rem; font-size: .85rem; width: auto; }
+.btn-sm { padding: .35rem .8rem; font-size: .85rem; width: auto; margin-top: 0; }
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
 header {
@@ -244,3 +244,77 @@ tfoot { position: sticky; bottom: 0; z-index: 1; }
 .badge.up   { background: rgba(34,197,94,.15); color: var(--success); }
 .badge.down { background: rgba(244,63,94,.15);  color: var(--danger); }
 .badge.flat { background: rgba(148,163,184,.1); color: var(--text-dim); }
+
+/* ── Scan Loader ──────────────────────────────────────────────────────────── */
+.loader-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2.5rem 3rem;
+}
+
+.loader-box p {
+  color: var(--text-dim);
+  font-size: .95rem;
+  margin: 0;
+}
+
+.spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Delete button ────────────────────────────────────────────────────────── */
+.btn-delete {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: .8rem;
+  padding: .2rem .45rem;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.btn-delete:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: rgba(244,63,94,.08);
+}
+
+/* ── Gmail Card ───────────────────────────────────────────────────────────── */
+.gmail-card .gmail-header {
+  display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem;
+}
+.gmail-card .gmail-header h3 { margin: 0; }
+#gmail-connect-area { display: flex; gap: .5rem; flex-wrap: wrap; }
+#gmail-scan-area { margin-top: .75rem; }
+#gmail-scan-area .btn-primary { margin-top: 0; }
+
+/* Wider scan preview modal */
+.gmail-scan-modal {
+  width: min(760px, 95vw);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.gmail-scan-modal h2 { margin-bottom: .75rem; }
+.gmail-preview-wrap {
+  flex: 1;
+  max-height: 55vh;
+  margin-bottom: 0;
+}
+
+/* Dimmed rows for unresolved entries */
+tr.gmail-unresolved td { opacity: .5; }
