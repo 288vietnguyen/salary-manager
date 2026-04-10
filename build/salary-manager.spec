@@ -63,7 +63,10 @@ hiddenimports = [
     "torchvision",
     "cv2",
     "PIL",
-    "PIL.Image"
+    "PIL.Image",
+    "PIL.ImageDraw",
+    "pystray",
+    "pystray._win32",
 ]
 
 # ── Analysis ──────────────────────────────────────────────────────────────────
